@@ -1,18 +1,18 @@
-const express = require("express");
+const express = require('express');
 const app = express();
-const { v4: uuidv4 } = require("uuid");
-const cors = require("cors");
+const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
 
 app.use(express.json());
 app.use(cors());
 
 let memory = [];
 
-app.get("/", (request, response) => {
+app.get('/', (request, response) => {
   response.send(memory);
 });
 
-app.get("/memory", (request, response) => {
+app.get('/memory', (request, response) => {
   response.json(memory);
 });
 
@@ -22,14 +22,14 @@ app.listen(PORT, () => {
 });
 
 //1. Get all
-app.get("/memory", (req, res) => {
+app.get('/memory', (req, res) => {
   res.json(memory);
 });
 
 //2. Get one (by id)
-app.get("/memory/:id", (req, res, next) => {
+app.get('/memory/:id', (req, res, next) => {
   const { params = {} } = req;
-  const { id = "" } = params;
+  const { id = '' } = params;
   const data = memory.find(function (element) {
     return id === element.id;
   });
@@ -45,24 +45,32 @@ app.get("/memory/:id", (req, res, next) => {
 });
 
 //3. Post (Se envía el body)
-app.post("/memory", (req, res) => {
+app.post('/memory', (req, res, next) => {
   const { body = {} } = req;
-  const data = {
-    ...body,
-    id: uuidv4(),
-  };
-  memory.push(data);
-  res.status(201).json(body);
+  const { operation, result } = req.body;
+  if (operation && result) {
+    const data = {
+      ...body,
+      id: uuidv4(),
+    };
+    memory.push(data);
+    res.status(201).json(body);
+  } else {
+    next({
+      statusCode: 400,
+      message: `Bad Request`,
+    });
+  }
 });
 
 //4. Put (Se envía el body)
-app.put("/memory/:id", (req, res) => {
+app.put('/memory/:id', (req, res) => {
   const { id } = req.params;
   const { operation, result } = req.body;
   const data = memory.find((data) => data.id === id);
 
   if (!data) {
-    return res.status(404).json({ message: "Data not found" });
+    return res.status(404).json({ message: 'Data not found' });
   }
 
   data.operation = operation;
@@ -71,12 +79,12 @@ app.put("/memory/:id", (req, res) => {
 });
 
 //5. Delete
-app.delete("/memory/:id", (req, res) => {
+app.delete('/memory/:id', (req, res) => {
   const { id } = req.params;
   const index = memory.findIndex((data) => data.id === id);
 
   if (index === -1) {
-    return res.status(404).json({ message: "Data not found" });
+    return res.status(404).json({ message: 'Data not found' });
   }
 
   memory.splice(index, 1);
@@ -86,12 +94,12 @@ app.delete("/memory/:id", (req, res) => {
 app.use((req, res, next) => {
   next({
     statusCode: 404,
-    message: "Route Not Found",
+    message: 'Route Not Found',
   });
 });
 
 app.use((err, req, res, next) => {
-  const { statusCode = 500, message = "Error" } = err;
+  const { statusCode = 500, message = 'Error' } = err;
   console.log(message);
   res.status(statusCode);
   res.json({
