@@ -2,19 +2,10 @@ const express = require('express');
 const app = express();
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
+const fs = require('fs');
 
 app.use(express.json());
 app.use(cors());
-
-let memory = [];
-
-app.get('/', (request, response) => {
-  response.send(memory);
-});
-
-app.get('/memory', (request, response) => {
-  response.json(memory);
-});
 
 const PORT = 3001;
 app.listen(PORT, () => {
@@ -22,24 +13,36 @@ app.listen(PORT, () => {
 });
 
 //1. Get all
-app.get('/memory', (req, res) => {
-  res.json(memory);
+app.get('/memory', (req, res, next) => {
+  try {
+    const jsonString = fs.readFileSync('./data.json', 'utf-8');
+    const memory = JSON.parse(jsonString);
+    res.send(memory);
+  } catch (error) {
+    next({
+      statusCode: 500,
+      message: `Cant read Data`,
+    });
+  }
 });
 
 //2. Get one (by id)
 app.get('/memory/:id', (req, res, next) => {
   const { params = {} } = req;
   const { id = '' } = params;
-  const data = memory.find(function (element) {
-    return id === element.id;
-  });
-
-  if (data) {
-    res.json(data);
-  } else {
+  try {
+    const jsonString = fs.readFileSync('./data.json', 'utf-8');
+    const memory = JSON.parse(jsonString);
+    const data = memory[id];
+    if (data) {
+      res.json(memory[id]);
+    } else {
+      return res.status(404).json({ message: 'Data not found' });
+    }
+  } catch (error) {
     next({
-      statusCode: 404,
-      message: `Data operation with ${id}, Not Found`,
+      statusCode: 500,
+      message: `Cant read Data`,
     });
   }
 });
@@ -49,12 +52,22 @@ app.post('/memory', (req, res, next) => {
   const { body = {} } = req;
   const { operation, result } = req.body;
   if (operation && result) {
-    const data = {
-      ...body,
-      id: uuidv4(),
-    };
-    memory.push(data);
-    res.status(201).json(body);
+    try {
+      const jsonString = fs.readFileSync('./data.json', 'utf-8');
+      const memory = JSON.parse(jsonString);
+      const id = uuidv4();
+      memory[id] = {
+        ...body,
+        id: id,
+      };
+      fs.writeFileSync('./data.json', JSON.stringify(memory, null, 2));
+      res.status(201).json(body);
+    } catch (error) {
+      next({
+        statusCode: 500,
+        message: `Cant read Data`,
+      });
+    }
   } else {
     next({
       statusCode: 400,
@@ -64,31 +77,51 @@ app.post('/memory', (req, res, next) => {
 });
 
 //4. Put (Se envía el body)
-app.put('/memory/:id', (req, res) => {
+app.put('/memory/:id', (req, res, next) => {
   const { id } = req.params;
   const { operation, result } = req.body;
-  const data = memory.find((data) => data.id === id);
-
-  if (!data) {
-    return res.status(404).json({ message: 'Data not found' });
+  if (operation && result) {
+    try {
+      const jsonString = fs.readFileSync('./data.json', 'utf-8');
+      const memory = JSON.parse(jsonString);
+      const data = memory[id];
+      if (data) {
+        memory[id].operation = operation;
+        memory[id].result = result;
+        fs.writeFileSync('./data.json', JSON.stringify(memory, null, 2));
+        res.status(201).json(data);
+      } else {
+        return res.status(404).json({ message: 'Data not found' });
+      }
+    } catch (err) {
+      next({
+        statusCode: 500,
+        message: `Cant read Data`,
+      });
+    }
+  } else {
+    next({
+      statusCode: 400,
+      message: `Bad Request`,
+    });
   }
-
-  data.operation = operation;
-  data.result = result;
-  res.json(data);
 });
 
 //5. Delete
 app.delete('/memory/:id', (req, res) => {
   const { id } = req.params;
-  const index = memory.findIndex((data) => data.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ message: 'Data not found' });
+  try {
+    const jsonString = fs.readFileSync('./data.json', 'utf-8');
+    const memory = JSON.parse(jsonString);
+    delete memory[id];
+    fs.writeFileSync('./data.json', JSON.stringify(memory, null, 2));
+    res.sendStatus(204);
+  } catch (err) {
+    next({
+      statusCode: 500,
+      message: `Cant read Data`,
+    });
   }
-
-  memory.splice(index, 1);
-  res.sendStatus(204);
 });
 
 app.use((req, res, next) => {
